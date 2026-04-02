@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harmony Engine MVP</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Earth Tone Color Palette */
+            --bg-color: #FAFAF7; /* Warm white */
+            --card-bg: #F3F1EB;  /* Soft cream/sand */
+            --text-main: #2D302D; /* Soft black */
+            --text-muted: #6E716E; /* Muted grey/green */
+            --accent-sage: #7A8B76; /* Muted sage green */
+            --accent-sage-hover: #657562;
+            --border-light: #E8E6DF;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        /* Mobile-first container constraint */
+        .app-container {
+            width: 100%;
+            max-width: 480px;
+            padding: 2rem 1.5rem;
+            position: relative;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        p {
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
+        }
+
+        /* Form Elements */
+        input, select, textarea {
+            width: 100%;
+            padding: 0.875rem;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            background: white;
+            margin-bottom: 1rem;
+            font-family: inherit;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--accent-sage);
+        }
+
+        /* Buttons */
+        .btn {
+            width: 100%;
+            padding: 1rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-sage);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-sage-hover);
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            border: 1px solid var(--border-light);
+            color: var(--text-main);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--card-bg);
+        }
+
+        /* Cards and Boards */
+        .card {
+            background-color: var(--card-bg);
+            padding: 1.25rem;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-light);
+        }
+
+        .idea-list {
+            margin-top: 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .idea-item {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-light);
+            font-size: 0.95rem;
+        }
+
+        /* Screen Management */
+        .screen {
+            display: none;
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Utilities */
+        .flex-row {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .loader {
+            text-align: center;
+            padding: 4rem 0;
+            color: var(--accent-sage);
+            font-weight: 500;
+        }
+
+        .timeline-item {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .timeline-time {
+            font-weight: 600;
+            color: var(--accent-sage);
+            min-width: 80px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+
+        <div id="screen-lobby" class="screen active">
+            <h1>Plan the Hangout.<br>Zero Arguments.</h1>
+            <p>Let the AI diplomat balance your group's tastes, budgets, and vetoes to build the perfect Friday night.</p>
+            
+            <div class="card" style="margin-top: 2rem;">
+                <label style="font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem; display: block;">Name your hangout</label>
+                <input type="text" id="hangout-name" placeholder="e.g., Friday Drinks in Soho" value="Friday Night Hangout">
+                <button class="btn btn-primary" onclick="goToScreen('screen-sandbox')">Create & Join Sandbox</button>
+            </div>
+        </div>
+
+        <div id="screen-sandbox" class="screen">
+            <h1 id="sandbox-title">Friday Night Hangout</h1>
+            <p>Drop your ideas below. The AI is taking notes.</p>
+
+            <div class="card">
+                <textarea id="idea-input" rows="2" placeholder="Drop a link or type an idea (e.g. 'Tacos downtown')"></textarea>
+                
+                <div class="flex-row">
+                    <select id="budget-input">
+                        <option value="">Max Budget</option>
+                        <option value="$">$ (Cheap & Cheerful)</option>
+                        <option value="$$">$$ (Moderate)</option>
+                        <option value="$$$">$$$ (Splurge)</option>
+                    </select>
+                </div>
+
+                <input type="text" id="veto-input" placeholder="Any hard vetoes? (e.g., 'No seafood')">
+                
+                <button class="btn btn-secondary" onclick="addIdea()">Add to Sandbox</button>
+            </div>
+
+            <div class="idea-list" id="ideas-container">
+                <div style="text-align: center; color: var(--text-muted); font-size: 0.875rem; font-style: italic;" id="empty-state">
+                    Sandbox is empty. Add the first idea!
+                </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="generatePlan()" id="generate-btn" style="display: none;">Generate Plan (AI)</button>
+        </div>
+
+        <div id="screen-loading" class="screen">
+            <div class="loader">
+                <div style="font-size: 2rem; margin-bottom: 1rem;">✨</div>
+                <h2>AI is negotiating...</h2>
+                <p style="margin-top: 0.5rem;">Balancing budgets, matching vibes, and avoiding vetoes to build the perfect plan.</p>
+            </div>
+        </div>
+
+        <div id="screen-voting" class="screen">
+            <h1>Proposed Plan</h1>
+            <p>The AI diplomat has synthesized your ideas into this timeline. How does it look?</p>
+
+            <div class="card">
+                <div class="timeline-item">
+                    <div class="timeline-time">7:00 PM</div>
+                    <div>
+                        <div style="font-weight: 500;">Dinner at El Camino</div>
+                        <div style="font-size: 0.875rem; color: var(--text-muted);">Tacos & Margaritas • $$</div>
+                    </div>
+                </div>
+                <div class="timeline-item" style="margin-bottom: 0;">
+                    <div class="timeline-time">8:30 PM</div>
+                    <div>
+                        <div style="font-weight: 500;">The Oak Room</div>
+                        <div style="font-size: 0.875rem; color: var(--text-muted);">Craft Cocktails & Lowkey Vibe • $$</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex-row" style="margin-top: 2rem;">
+                <button class="btn btn-secondary" onclick="goToScreen('screen-sandbox')">👎 Veto</button>
+                <button class="btn btn-primary" onclick="goToScreen('screen-success')">👍 Looks Good</button>
+            </div>
+        </div>
+
+        <div id="screen-success" class="screen">
+            <div style="text-align: center; margin-bottom: 2rem; margin-top: 2rem;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🤝</div>
+                <h1>Plan Locked!</h1>
+                <p>No arguments. No group chat spam. Just a solid Friday night.</p>
+            </div>
+
+            <div class="card">
+                <div class="timeline-item">
+                    <div class="timeline-time">7:00 PM</div>
+                    <div>
+                        <div style="font-weight: 500;">El Camino</div>
+                        <a href="#" style="font-size: 0.875rem; color: var(--accent-sage); text-decoration: none;">View Menu / Maps →</a>
+                    </div>
+                </div>
+                <div class="timeline-item" style="margin-bottom: 0;">
+                    <div class="timeline-time">8:30 PM</div>
+                    <div>
+                        <div style="font-weight: 500;">The Oak Room</div>
+                        <a href="#" style="font-size: 0.875rem; color: var(--accent-sage); text-decoration: none;">View Maps →</a>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="btn btn-secondary" style="margin-top: 1rem;" onclick="location.reload()">Start a New Hangout</button>
+        </div>
+
+    </div>
+
+    <script>
+        let ideasCount = 0;
+
+        // Function to handle screen transitions
+        function goToScreen(screenId) {
+            // Hide all screens
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            // Show target screen
+            document.getElementById(screenId).classList.add('active');
+
+            // Update title on sandbox screen if coming from lobby
+            if(screenId === 'screen-sandbox') {
+                const title = document.getElementById('hangout-name').value || 'Friday Night Hangout';
+                document.getElementById('sandbox-title').innerText = title;
+            }
+        }
+
+        // Function to add an idea to the sandbox board
+        function addIdea() {
+            const ideaText = document.getElementById('idea-input').value;
+            const budget = document.getElementById('budget-input').value;
+            const veto = document.getElementById('veto-input').value;
+
+            if (!ideaText && !veto) return; // Don't add if empty
+
+            const container = document.getElementById('ideas-container');
+            const emptyState = document.getElementById('empty-state');
+            
+            if (emptyState) emptyState.style.display = 'none';
+
+            // Create new idea card
+            const ideaDiv = document.createElement('div');
+            ideaDiv.className = 'idea-item';
+            
+            let content = `<strong>Idea:</strong> ${ideaText || 'No specific venue'}`;
+            if (budget) content += `<br><span style="color: #6E716E; font-size: 0.85rem;">Budget: ${budget}</span>`;
+            if (veto) content += `<br><span style="color: #D32F2F; font-size: 0.85rem;">Veto: ${veto}</span>`;
+
+            ideaDiv.innerHTML = content;
+            container.appendChild(ideaDiv);
+
+            // Clear inputs
+            document.getElementById('idea-input').value = '';
+            document.getElementById('veto-input').value = '';
+            document.getElementById('budget-input').value = '';
+
+            ideasCount++;
+            
+            // Show the Generate button once an idea is added
+            if(ideasCount > 0) {
+                document.getElementById('generate-btn').style.display = 'block';
+            }
+        }
+
+        // Function to simulate the AI generating a plan
+        function generatePlan() {
+            goToScreen('screen-loading');
+            
+            // Simulate a 2.5 second delay for the AI "thinking" before showing the plan
+            setTimeout(() => {
+                goToScreen('screen-voting');
+            }, 2500);
+        }
+    </script>
+</body>
+</html>
