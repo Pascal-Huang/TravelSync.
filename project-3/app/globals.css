@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Design Tokens ──────────────────────────────────────── */
+  --color-cream: #F7F5F0;
+  --color-cream-deep: #EDEAE2;
+  --color-parchment: #FAF8F4;
+  --color-sage: #7A9E8E;
+  --color-sage-light: #A8C5B7;
+  --color-sage-dim: #EDF3F0;
+  --color-sand: #C4A882;
+  --color-sand-light: #EFE5D6;
+  --color-terra: #B8714E;
+  --color-terra-light: #F0E0D6;
+  --color-ink: #2C2B28;
+  --color-ink-mid: #5C5A56;
+  --color-ink-faint: #9B9892;
+
+  /* ── Typography ──────────────────────────────────────────── */
+  --font-display: var(--font-dm-serif), serif;
+  --font-sans: var(--font-outfit), sans-serif;
+
+  /* ── Border Radius ───────────────────────────────────────── */
+  --radius-card: 10px;
+  --radius-panel: 16px;
+
+  /* ── Box Shadow ──────────────────────────────────────────── */
+  --shadow-soft: 0 1px 4px rgba(44,43,40,.06), 0 2px 12px rgba(44,43,40,.04);
+  --shadow-float: 0 4px 16px rgba(44,43,40,.08), 0 1px 4px rgba(44,43,40,.04);
+
+  /* ── Animations ──────────────────────────────────────────── */
+  --animate-fade-up: fadeUp .34s cubic-bezier(.4,0,.2,1) both;
+  --animate-pop-in: popIn .22s cubic-bezier(.34,1.56,.64,1) both;
+  --animate-lock-pop: lockPop .46s cubic-bezier(.34,1.56,.64,1) 0.05s both;
+  --animate-bounce-dot: bounceDot 1.2s ease-in-out infinite;
+  --animate-load-pulse: loadPulse 1.8s ease-in-out infinite;
+  --animate-cel-wiggle: celWiggle 1.3s ease-in-out infinite;
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes popIn {
+    from { opacity: 0; transform: scale(0.87); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes lockPop {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  @keyframes bounceDot {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-7px); }
+  }
+  @keyframes loadPulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+  }
+  @keyframes celWiggle {
+    0%, 100% { transform: rotate(-7deg) scale(1); }
+    50% { transform: rotate(7deg) scale(1.14); }
+  }
+}
+
+/* ─── Reusable component classes ─────────────────────────────────────────── */
+@layer components {
+  /* Group all three fields together for the base styles */
+  .input-field,
+  .textarea-field,
+  .select-field {
+    @apply w-full bg-parchment border-[1.5px] border-cream-deep rounded-card
+           px-3.5 py-3 font-sans text-[0.92rem] text-ink outline-none
+           transition-all duration-[260ms] ease-[cubic-bezier(.4,0,.2,1)]
+           focus:border-sage focus:shadow-[0_0_0_3px_rgba(122,158,142,0.13)];
+  }
+
+  /* Add the specific extras for the textarea */
+  .textarea-field {
+    @apply resize-none min-h-[82px] leading-relaxed;
+  }
+
+  /* Add the specific extras for the select dropdown */
+  .select-field {
+    @apply pr-9 cursor-pointer;
+  }
+
+  /* Primary action button base */
+  .btn-primary {
+    @apply flex items-center justify-center gap-2 w-full
+           py-[15px] px-[22px] rounded-panel font-semibold text-[0.93rem]
+           transition-all duration-[260ms] active:scale-[0.97]
+           [-webkit-tap-highlight-color:transparent];
+  }
+}
