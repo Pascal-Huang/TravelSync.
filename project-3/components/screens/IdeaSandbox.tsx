@@ -74,6 +74,7 @@ export default function IdeaSandbox({ planDetails, ideas, onAddIdea, onGenerate,
   const [budget,       setBudget]       = useState<'$' | '$$' | '$$$'>('$$')
   const [dealbreaker,  setDealbreaker]  = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [trip, setTrip] = useState(null);
 
   // Focus textarea on mount so mobile users can start typing immediately
   useEffect(() => { textareaRef.current?.focus() }, [])
@@ -100,6 +101,42 @@ export default function IdeaSandbox({ planDetails, ideas, onAddIdea, onGenerate,
     // Enter (without Shift) submits; Shift+Enter inserts newline
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAdd() }
   }
+
+    // This function will run when the user clicks your "Generate Trip" button
+const handleGenerateTrip = async () => {
+  try {
+    console.log("Sending order to the AI...");
+    
+    // TEMP DATA - replace with real user input from your screens
+    const orderData = {
+      location: "Ottawa",
+      days: 3,
+      ideas: "I want to eat food, and check out a museum"
+    };
+
+    // 2. Call your backend route
+    const response = await fetch('/api/generate-trip', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(orderData), // Convert our order into text for the journey
+    });
+
+    // 3. Receive the cooked data back!
+    const tripData = await response.json();
+    setTrip(tripData); 
+    console.log("Data saved to React state!");
+    
+    // 4. Log it to prove it works!
+    console.log("THE AI RESPONDED! Here is your trip:", tripData);
+    
+    // (Later, you will do something like setItinerary(tripData) here to show it on screen)
+
+  } catch (error) {
+    console.error("The waiter tripped! Error:", error);
+  }
+};
 
   return (
     <section
@@ -176,7 +213,7 @@ export default function IdeaSandbox({ planDetails, ideas, onAddIdea, onGenerate,
             value={ideaText}
             onChange={e => setIdeaText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="e.g. That new sushi place on Michigan Ave, a Google Maps link, rooftop bar…"
+            placeholder="e.g. New sushi resturant in Ottawa, a Google Maps link, rooftop bar, hidden gems, Instagram link, etc…"
             className="textarea-field"
           />
         </div>
@@ -230,7 +267,10 @@ export default function IdeaSandbox({ planDetails, ideas, onAddIdea, onGenerate,
       {/* ── Sticky generate button ────────────────────────────── */}
       <div className="sticky bottom-0 pt-[14px] bg-gradient-to-t from-cream from-[70%] to-transparent">
         <button
-          onClick={onGenerate}
+          onClick={() => {
+            onGenerate()
+            handleGenerateTrip()
+          }}
           className="btn-primary bg-ink text-white shadow-[0_2px_10px_rgba(44,43,40,0.16)] hover:bg-[#1c1b18]"
           aria-label="Generate AI itinerary"
         >

@@ -6,5 +6,5 @@
 import Project3 from '@/components/Project3'
 
 export default function Page() {
-  return <Project3 />
+  return <Project3/>
 }

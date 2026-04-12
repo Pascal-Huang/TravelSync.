@@ -12,7 +12,7 @@ export default function TopBar({ step }: TopBarProps) {
     <div className="flex items-center justify-between py-[22px] pb-4">
       {/* Logo */}
       <div className="font-display text-xl text-ink tracking-[-0.01em]">
-        harmony<span className="text-sage">.</span>
+        TravelSync<span className="text-sage">.</span>
       </div>
 
       {/* Optional step pill */}

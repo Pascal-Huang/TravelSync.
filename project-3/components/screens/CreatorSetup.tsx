@@ -70,7 +70,7 @@ export default function CreatorSetup({ onSubmit }: Props) {
     })
   }
 
-  const FEATURES = ['🗳️ Group voting', '🚫 Dealbreaker aware', '💸 Budget balanced', '✦ AI synthesis']
+  const FEATURES = ['🗳️ Group voting', '🚫 Dealbreaker aware', '✦ AI synthesis']
 
   return (
     <section
@@ -104,7 +104,7 @@ export default function CreatorSetup({ onSubmit }: Props) {
           aria-label="Social proof"
         >
           <div className="flex" aria-hidden="true">
-            {(['😊', '🙂', '😄'] as const).map((emoji, i) => (
+            {(['😉', '📺', '😍'] as const).map((emoji, i) => (
               <div
                 key={emoji}
                 className={[
@@ -129,9 +129,9 @@ export default function CreatorSetup({ onSubmit }: Props) {
         {/* Plan details form */}
         <div className="bg-white border border-cream-deep rounded-panel p-[18px] shadow-soft">
           <CardLabel>Plan Details</CardLabel>
-          <Field id="inp-name"  label="Plan Name"       value={name}     onChange={setName}     placeholder="e.g. Chicago Weekend, Friday Dinner…" maxLength={52} />
-          <Field id="inp-loc"   label="Location"        value={location} onChange={setLocation} placeholder="e.g. Downtown Chicago"                maxLength={60} />
-          <Field id="inp-dates" label="Dates / Duration" value={dates}   onChange={setDates}    placeholder="e.g. Oct 12–14  or  4 hours"          maxLength={40} />
+          <Field id="inp-name"  label="Plan Name"       value={name}     onChange={setName}     placeholder="e.g. Ottawa Weekend, Friday Dinner" maxLength={52} />
+          <Field id="inp-loc"   label="Location"        value={location} onChange={setLocation} placeholder="e.g. Downtown Toronto, Japan"                maxLength={60} />
+          <Field id="inp-dates" label="Dates / Duration" value={dates}   onChange={setDates}    placeholder="e.g. Aug 12–14  or  4 hours"          maxLength={40} />
         </div>
 
         {/* Submit */}
