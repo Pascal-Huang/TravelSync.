@@ -1,11 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { PlanDetails } from '../../types' // Make sure this path is still correct!
+import { useState, useEffect, useCallback } from 'react'
+import { PlanDetails, IdeaItem } from '../../types'
+import { buildOrderData, isGeneratedTrip, type GeneratedTrip } from '../../lib/buildTripOrder'
 import TopBar from '../TopBar'
 
 interface Props {
   planDetails:  PlanDetails
+  ideas:        IdeaItem[]
+  initialTrip:  GeneratedTrip | null
   onApprove:    () => void
   onRegenerate: () => void
   showToast:    (msg: string) => void
@@ -29,96 +32,95 @@ interface Stop {
   tags:    { label: string; cls: string }[]
 }
 
-export default function AIDraft({ planDetails, onApprove, onRegenerate, showToast }: Props) {
-  const [isLoading, setIsLoading] = useState(true)
+function tripJsonToStops(aiData: GeneratedTrip): Stop[] {
+  const formattedStops: Stop[] = []
+  const colors = ['bg-sage', 'bg-sand', 'bg-terra']
+
+  aiData.itinerary.forEach(day => {
+    day.activities.forEach((activity, index) => {
+      const dotCls = colors[(day.day + index) % colors.length]
+      formattedStops.push({
+        when: `Day ${day.day}`,
+        time: activity.time,
+        dotCls,
+        hasLine: true,
+        name: activity.description.split('.')[0] || 'Activity',
+        desc: activity.description,
+        tags: [{ label: day.theme, cls: 'bg-sage-dim text-sage' }],
+      })
+    })
+  })
+
+  if (formattedStops.length > 0) {
+    formattedStops[formattedStops.length - 1].hasLine = false
+  }
+  return formattedStops
+}
+
+export default function AIDraft({ planDetails, ideas, initialTrip, onApprove, onRegenerate, showToast }: Props) {
+  const [isLoading, setIsLoading] = useState(!initialTrip)
   const [loadLabel, setLoadLabel] = useState(PHRASES[0])
-  
-  // 1. New Memory Boxes for our real AI data!
-  const [tripTitle, setTripTitle] = useState("Proposed Itinerary ✦");
-  const [itineraryStops, setItineraryStops] = useState<Stop[]>([])
 
-  // 2. The function that talks to your backend
-  const generateRealTrip = async () => {
-    setIsLoading(true);
-    setItineraryStops([]); // Clear old trip if regenerating
-    
+  const [tripTitle, setTripTitle] = useState(initialTrip?.tripName ?? 'Proposed Itinerary ✦')
+  const [itineraryStops, setItineraryStops] = useState<Stop[]>(() =>
+    initialTrip ? tripJsonToStops(initialTrip) : [],
+  )
+
+  const applyTripJson = useCallback((aiData: GeneratedTrip) => {
+    setTripTitle(aiData.tripName)
+    setItineraryStops(tripJsonToStops(aiData))
+  }, [])
+
+  const generateRealTrip = useCallback(async () => {
+    setIsLoading(true)
+    setItineraryStops([])
+
+    const orderData = buildOrderData(planDetails, ideas)
+
     try {
-      // (Later, you will swap these hardcoded values with planDetails.location, etc.)
-      const orderData = {
-        location: "Tokyo, Japan",
-        days: 2,
-        ideas: "I want to eat sushi, visit a neon arcade, and I have a $500 budget."
-      };
-
       const response = await fetch('/api/generate-trip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderData),
-      });
+      })
 
-      const aiData = await response.json();
-      
-      // Save the AI's creative title
-      setTripTitle(aiData.tripName);
-
-      // 3. Translate the AI JSON into your beautiful UI format!
-      const formattedStops: Stop[] = [];
-      const colors = ['bg-sage', 'bg-sand', 'bg-terra'];
-
-      aiData.itinerary.forEach((day: any) => {
-        day.activities.forEach((activity: any, index: number) => {
-          // Grab a rotating color for the timeline dot
-          const randomColor = colors[(day.day + index) % colors.length];
-
-          formattedStops.push({
-            when: `Day ${day.day}`,
-            time: activity.time,
-            dotCls: randomColor, 
-            hasLine: true, // We will fix the very last one below
-            name: activity.description.split('.')[0] || "Activity", // Uses first sentence as title
-            desc: activity.description,
-            tags: [
-              { label: day.theme, cls: 'bg-sage-dim text-sage' }
-            ]
-          });
-        });
-      });
-
-      // Remove the line from the very last stop so the UI looks clean
-      if (formattedStops.length > 0) {
-        formattedStops[formattedStops.length - 1].hasLine = false;
+      const aiData = await response.json()
+      if (!response.ok || aiData?.error || !isGeneratedTrip(aiData)) {
+        showToast(typeof aiData?.error === 'string' ? aiData.error : 'Failed to generate trip. Please try again.')
+        return
       }
-
-      setItineraryStops(formattedStops);
-
+      applyTripJson(aiData)
     } catch (error) {
-      console.error("Failed to fetch AI data:", error);
-      showToast("Failed to generate trip. Please try again.");
+      console.error('Failed to fetch AI data:', error)
+      showToast('Failed to generate trip. Please try again.')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }, [planDetails, ideas, showToast, applyTripJson])
 
-  // 4. Run the phrase rotator AND the real AI fetch when the page loads
   useEffect(() => {
-    // Start phrase rotator
-    let idx = 0;
+    if (!initialTrip) return
+    applyTripJson(initialTrip)
+    setIsLoading(false)
+  }, [initialTrip, applyTripJson])
+
+  useEffect(() => {
+    if (initialTrip) return
+
+    let idx = 0
     const interval = setInterval(() => {
-      idx = (idx + 1) % PHRASES.length;
-      setLoadLabel(PHRASES[idx]);
-    }, 1500); // Slowed down slightly so users can read them!
+      idx = (idx + 1) % PHRASES.length
+      setLoadLabel(PHRASES[idx])
+    }, 1500)
 
-    // Start the real AI generation!
-    generateRealTrip();
+    void generateRealTrip()
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => clearInterval(interval)
+  }, [initialTrip, generateRealTrip])
 
-  // 5. Update the "Regenerate" button to actually fetch a new trip
   const handleRegenerate = () => {
-    generateRealTrip();
-    onRegenerate(); // Still call your original prop if needed
-  };
+    onRegenerate()
+  }
 
   return (
     <section className="flex flex-col w-full max-w-[480px] min-h-[100dvh] px-5 pb-[52px] relative z-[1] animate-fade-up">

@@ -24,7 +24,7 @@ const outfit = Outfit({
 
 // ── Metadata ──────────────────────────────────────────────────────────────
 export const metadata: Metadata = {
-  title:       'Harmony Engine',
+  title:       'TravelSync.',
   description: 'Collaborative planning, perfected. AI-synthesised itineraries for every group.',
 }
 

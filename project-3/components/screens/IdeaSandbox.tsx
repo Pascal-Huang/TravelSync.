@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { PlanDetails, IdeaItem } from '../../types'
+import { buildOrderData, isGeneratedTrip, type GeneratedTrip } from '../../lib/buildTripOrder'
 import { getIdeaIcon } from '../../lib/utils'
 import TopBar from '../TopBar'
 
@@ -9,6 +10,7 @@ interface Props {
   planDetails: PlanDetails
   ideas:       IdeaItem[]
   onAddIdea:   (idea: IdeaItem) => void
+  onTripReady: (trip: GeneratedTrip) => void
   onGenerate:  () => void
   showToast:   (msg: string) => void
 }
@@ -67,65 +69,39 @@ function genHint(count: number): string {
   return `${count} ideas in the sandbox — AI will reconcile them all`
 }
 
-/** Best-effort day count from CreatorSetup's free-text dates (e.g. "Aug 12–14", "3 days"). */
-function inferTripDays(dates: string): number {
-  const d = dates.trim()
-  if (!d) return 3
-  const dayWord = d.match(/(\d+)\s*days?/i)
-  if (dayWord) return Math.min(14, Math.max(1, parseInt(dayWord[1], 10)))
-  if (/\d+\s*hours?/i.test(d)) return 1
-  const span = d.match(/(\d{1,2})\s*[–-]\s*(\d{1,2})/)
-  if (span) {
-    const a = parseInt(span[1], 10)
-    const b = parseInt(span[2], 10)
-    if (b >= a && b - a <= 30) return Math.min(14, Math.max(1, b - a + 1))
-  }
-  const n = parseInt(d.match(/\b(\d{1,2})\b/)?.[1] ?? '', 10)
-  if (n >= 1 && n <= 14) return n
-  return 3
-}
-
-/** Builds the single `ideas` string the generate-trip API sends to the model. */
-function buildIdeasPayload(
-  plan: PlanDetails,
-  board: IdeaItem[],
-  draftText: string,
-  draftBudget: string,
-  draftDealbreaker: string,
-): string {
-  const lines: string[] = []
-  if (plan.name.trim()) lines.push(`Trip name: ${plan.name.trim()}`)
-  if (plan.dates.trim()) lines.push(`Dates / duration: ${plan.dates.trim()}`)
-  if (lines.length) lines.push('')
-  board.forEach((idea, i) => {
-    let row = `${i + 1}. ${idea.text} [max budget: ${idea.budget}]`
-    if (idea.dealbreaker.trim()) row += ` [dealbreakers: ${idea.dealbreaker.trim()}]`
-    lines.push(row)
-  })
-  const draft = draftText.trim()
-  if (draft) {
-    if (board.length) lines.push('')
-    lines.push(
-      `${board.length ? 'Also typed in the form (not yet on the board)' : 'Idea from the form'}: ${draft} [max budget: ${draftBudget}]` +
-        (draftDealbreaker.trim() ? ` [dealbreakers: ${draftDealbreaker.trim()}]` : ''),
-    )
-  }
-  return lines.join('\n')
-}
+const GENERATE_PHRASES = [
+  "AI is drafting your itinerary…",
+  'Weighing group ideas & budgets…',
+  'Checking dealbreakers & timing…',
+  'Almost ready…',
+]
 
 // ── Screen component ────────────────────────────────────────────────────────
 
-export default function IdeaSandbox({ planDetails, ideas, onAddIdea, onGenerate, showToast }: Props) {
+export default function IdeaSandbox({ planDetails, ideas, onAddIdea, onTripReady, onGenerate, showToast }: Props) {
   const [ideaText,     setIdeaText]     = useState('')
   const [budget,       setBudget]       = useState<'$' | '$$' | '$$$'>('$$')
   const [dealbreaker,  setDealbreaker]  = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [genLabel,     setGenLabel]     = useState(GENERATE_PHRASES[0])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const [trip, setTrip] = useState(null);
+  const generateInFlightRef = useRef(false)
 
   // Focus textarea on mount so mobile users can start typing immediately
   useEffect(() => { textareaRef.current?.focus() }, [])
 
+  useEffect(() => {
+    if (!isGenerating) return
+    let idx = 0
+    const interval = setInterval(() => {
+      idx = (idx + 1) % GENERATE_PHRASES.length
+      setGenLabel(GENERATE_PHRASES[idx])
+    }, 1500)
+    return () => clearInterval(interval)
+  }, [isGenerating])
+
   const handleAdd = () => {
+    if (isGenerating) return
     const text = ideaText.trim()
     if (!text) {
       showToast('Write an idea or paste a link first.')
@@ -144,12 +120,14 @@ export default function IdeaSandbox({ planDetails, ideas, onAddIdea, onGenerate,
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (isGenerating) return
     // Enter (without Shift) submits; Shift+Enter inserts newline
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAdd() }
   }
 
   /** Returns true only when the API returns a usable itinerary (so the app can advance). */
   const handleGenerateTrip = async (): Promise<boolean> => {
+    if (isGenerating || generateInFlightRef.current) return false
     const hasBoard = ideas.length > 0
     const hasDraft = ideaText.trim().length > 0
     if (!hasBoard && !hasDraft) {
@@ -157,19 +135,16 @@ export default function IdeaSandbox({ planDetails, ideas, onAddIdea, onGenerate,
       return false
     }
 
-    const loc = planDetails.location.trim() || 'your destination'
-    const orderData = {
-      location: loc,
-      days: inferTripDays(planDetails.dates),
-      ideas: buildIdeasPayload(
-        planDetails,
-        ideas,
-        ideaText,
-        budget,
-        dealbreaker,
-      ),
-    }
+    const orderData = buildOrderData(planDetails, ideas, {
+      text: ideaText,
+      budget,
+      dealbreaker,
+    })
 
+    generateInFlightRef.current = true
+    setGenLabel(GENERATE_PHRASES[0])
+    setIsGenerating(true)
+    let succeeded = false
     try {
       const response = await fetch('/api/generate-trip', {
         method: 'POST',
@@ -178,16 +153,22 @@ export default function IdeaSandbox({ planDetails, ideas, onAddIdea, onGenerate,
       })
 
       const tripData = await response.json()
-      if (!response.ok || tripData?.error) {
+      if (!response.ok || tripData?.error || !isGeneratedTrip(tripData)) {
         showToast(typeof tripData?.error === 'string' ? tripData.error : 'Failed to generate trip. Please try again.')
         return false
       }
-      setTrip(tripData)
+      onTripReady(tripData)
+      succeeded = true
       return true
     } catch (error) {
       console.error('Generate trip error:', error)
       showToast('Could not reach the trip planner. Try again.')
       return false
+    } finally {
+      if (!succeeded) {
+        generateInFlightRef.current = false
+        setIsGenerating(false)
+      }
     }
   }
 
@@ -198,6 +179,33 @@ export default function IdeaSandbox({ planDetails, ideas, onAddIdea, onGenerate,
       aria-labelledby="s2-title"
       aria-live="polite"
     >
+      {isGenerating && (
+        <div
+          className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-5 px-6 text-center bg-cream/92 backdrop-blur-[3px]"
+          role="alertdialog"
+          aria-modal="true"
+          aria-busy="true"
+          aria-labelledby="sandbox-gen-title"
+        >
+          <div className="pulse-ring w-[66px] h-[66px] rounded-full bg-sage-dim flex items-center justify-center">
+            <span className="text-[1.65rem]" aria-hidden="true">✦</span>
+          </div>
+          <div>
+            <p id="sandbox-gen-title" className="text-[0.9rem] text-ink-mid font-medium animate-load-pulse">
+              {genLabel}
+            </p>
+            <p className="text-[0.75rem] text-ink-faint mt-2 max-w-[280px] mx-auto leading-relaxed">
+              Hang tight — only one request runs at a time.
+            </p>
+            <div className="flex gap-1.5 justify-center mt-3" aria-hidden="true">
+              <span className="w-1.5 h-1.5 bg-sage-light rounded-full animate-bounce-dot" />
+              <span className="w-1.5 h-1.5 bg-sage-light rounded-full animate-bounce-dot [animation-delay:.2s]" />
+              <span className="w-1.5 h-1.5 bg-sage-light rounded-full animate-bounce-dot [animation-delay:.4s]" />
+            </div>
+          </div>
+        </div>
+      )}
+
       <TopBar step="Step 1 / 3" />
 
       <h2
@@ -266,6 +274,7 @@ export default function IdeaSandbox({ planDetails, ideas, onAddIdea, onGenerate,
             value={ideaText}
             onChange={e => setIdeaText(e.target.value)}
             onKeyDown={handleKeyDown}
+            disabled={isGenerating}
             placeholder="e.g. New sushi resturant in Ottawa, a Google Maps link, rooftop bar, hidden gems, Instagram link, etc…"
             className="textarea-field"
           />
@@ -281,6 +290,7 @@ export default function IdeaSandbox({ planDetails, ideas, onAddIdea, onGenerate,
               id="inp-budget"
               value={budget}
               onChange={e => setBudget(e.target.value as '$' | '$$' | '$$$')}
+              disabled={isGenerating}
               aria-label="Maximum budget"
               className="select-field"
             >
@@ -298,6 +308,7 @@ export default function IdeaSandbox({ planDetails, ideas, onAddIdea, onGenerate,
               type="text"
               value={dealbreaker}
               onChange={e => setDealbreaker(e.target.value)}
+              disabled={isGenerating}
               placeholder="e.g. No seafood"
               maxLength={52}
               className="input-field"
@@ -308,8 +319,10 @@ export default function IdeaSandbox({ planDetails, ideas, onAddIdea, onGenerate,
         {/* Add button */}
         <div className="flex justify-end mt-3">
           <button
+            type="button"
             onClick={handleAdd}
-            className="flex items-center justify-center gap-1.5 px-4 py-[10px] rounded-card bg-sage text-white font-semibold text-[0.83rem] shadow-[0_2px_10px_rgba(122,158,142,0.2)] transition-all active:scale-[0.97] hover:bg-[#6a8e7e] [-webkit-tap-highlight-color:transparent]"
+            disabled={isGenerating}
+            className="flex items-center justify-center gap-1.5 px-4 py-[10px] rounded-card bg-sage text-white font-semibold text-[0.83rem] shadow-[0_2px_10px_rgba(122,158,142,0.2)] transition-all active:scale-[0.97] hover:bg-[#6a8e7e] [-webkit-tap-highlight-color:transparent] disabled:opacity-50 disabled:pointer-events-none"
             aria-label="Add idea to sandbox"
           >
             ＋ Add to Sandbox
@@ -320,14 +333,16 @@ export default function IdeaSandbox({ planDetails, ideas, onAddIdea, onGenerate,
       {/* ── Sticky generate button ────────────────────────────── */}
       <div className="sticky bottom-0 pt-[14px] bg-gradient-to-t from-cream from-[70%] to-transparent">
         <button
+          type="button"
           onClick={async () => {
             const ok = await handleGenerateTrip()
             if (ok) onGenerate()
           }}
-          className="btn-primary bg-ink text-white shadow-[0_2px_10px_rgba(44,43,40,0.16)] hover:bg-[#1c1b18]"
+          disabled={isGenerating}
+          className="btn-primary bg-ink text-white shadow-[0_2px_10px_rgba(44,43,40,0.16)] hover:bg-[#1c1b18] disabled:opacity-60 disabled:pointer-events-none"
           aria-label="Generate AI itinerary"
         >
-          <span aria-hidden="true">✦</span> Generate Itinerary (AI)
+          <span aria-hidden="true">✦</span> {isGenerating ? 'Generating…' : 'Generate Itinerary (AI)'}
         </button>
         <p className="text-center text-[0.73rem] text-ink-faint mt-[7px]">
           {genHint(ideas.length)}

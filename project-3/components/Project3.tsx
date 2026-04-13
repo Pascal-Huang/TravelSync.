@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { Screen, PlanDetails, IdeaItem } from '../types'
+import type { GeneratedTrip } from '../lib/buildTripOrder'
 import CreatorSetup from './screens/CreatorSetup'
 import IdeaSandbox  from './screens/IdeaSandbox'
 import AIDraft      from './screens/AIDraft'
@@ -23,6 +24,7 @@ export default function HarmonyApp() {
   const [screen, setScreen]       = useState<Screen>('setup')
   const [planDetails, setPlan]    = useState<PlanDetails>({ name: '', location: '', dates: '' })
   const [ideas, setIdeas]         = useState<IdeaItem[]>([])
+  const [generatedTrip, setGeneratedTrip] = useState<GeneratedTrip | null>(null)
   const [draftKey, setDraftKey]   = useState(0)
   const [toastMsg, setToastMsg]   = useState<string | null>(null)
 
@@ -57,12 +59,14 @@ export default function HarmonyApp() {
    */
   const handleRegenerate = () => {
     showToast('Generating a fresh itinerary…')
+    setGeneratedTrip(null)
     setDraftKey(k => k + 1)
   }
 
   const handleStartOver = () => {
     setPlan({ name: '', location: '', dates: '' })
     setIdeas([])
+    setGeneratedTrip(null)
     setDraftKey(0)
     setScreen('setup')
   }
@@ -88,6 +92,7 @@ export default function HarmonyApp() {
           planDetails={planDetails}
           ideas={ideas}
           onAddIdea={handleAddIdea}
+          onTripReady={setGeneratedTrip}
           onGenerate={handleGenerate}
           showToast={showToast}
         />
@@ -97,6 +102,8 @@ export default function HarmonyApp() {
         <AIDraft
           key={draftKey}           // re-mount triggers fresh loading animation
           planDetails={planDetails}
+          ideas={ideas}
+          initialTrip={generatedTrip}
           onApprove={handleApprove}
           onRegenerate={handleRegenerate}
           showToast={showToast}
