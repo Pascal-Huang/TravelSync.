@@ -1,7 +1,9 @@
 'use client'
 
+import { useMemo, useState } from 'react'
 import { PlanDetails } from '../../types'
 import { GeneratedTrip } from '../../lib/buildTripOrder'
+import { ItineraryDayTabBar } from '../ItineraryDayTabBar'
 import TopBar from '../TopBar'
 
 interface Props {
@@ -25,40 +27,54 @@ interface FinalStop {
   icon:      string
 }
 
-function tripToStops(trip: GeneratedTrip): FinalStop[] {
+function tripToStopsForDay(trip: GeneratedTrip, dayIndex: number): FinalStop[] {
+  const day = trip.itinerary[dayIndex]
+  if (!day) return []
+
   const colors = ['bg-sage', 'bg-sand', 'bg-terra']
   const accents = [
     { from: 'from-sage', to: 'to-sage-light' },
     { from: 'from-sand', to: 'to-[#d4b896]' },
     { from: 'from-terra', to: 'to-[#cc8a6a]' },
   ]
-  const stops: FinalStop[] = []
-  let num = 1
+  const multiDay = trip.itinerary.length > 1
 
-  trip.itinerary.forEach(day => {
-    day.activities.forEach(activity => {
-      const colorIdx = (num - 1) % colors.length
-      stops.push({
-        num,
-        numCls: colors[colorIdx],
-        accentFrom: accents[colorIdx].from,
-        accentTo: accents[colorIdx].to,
-        when: `Day ${day.day} · ${activity.time}`,
-        name: activity.name,
-        desc: activity.description,
-        icon: '📍', // Default icon, could map from tags
-      })
-      num++
-    })
+  return day.activities.map((activity, i) => {
+    const colorIdx = i % colors.length
+    return {
+      num: i + 1,
+      numCls: colors[colorIdx],
+      accentFrom: accents[colorIdx].from,
+      accentTo: accents[colorIdx].to,
+      when: multiDay ? activity.time : `Day ${day.day} · ${activity.time}`,
+      name: activity.name,
+      desc: activity.description,
+      icon: '📍',
+    }
   })
+}
 
-  return stops
+function tripToShareLines(trip: GeneratedTrip): string[] {
+  const lines: string[] = []
+  let n = 1
+  for (const day of trip.itinerary) {
+    for (const activity of day.activities) {
+      lines.push(`${n}. Day ${day.day} · ${activity.time} — ${activity.name}`)
+      n++
+    }
+  }
+  return lines
 }
 
 // ── Screen component ────────────────────────────────────────────────────────
 
 export default function SuccessState({ planDetails, trip, onStartOver, showToast }: Props) {
-  const stops = tripToStops(trip)
+  const days = trip.itinerary
+  const [activeDayIndex, setActiveDayIndex] = useState(0)
+  const stops = useMemo(
+    () => tripToStopsForDay(trip, Math.min(activeDayIndex, Math.max(0, days.length - 1))),
+    [trip, activeDayIndex, days.length],
+  )
 
   const handleCopyLink = () => {
     const url = `https://harmony.app/p/${Math.random().toString(36).slice(2, 8).toUpperCase()}`
@@ -70,7 +86,7 @@ export default function SuccessState({ planDetails, trip, onStartOver, showToast
   }
 
   const handleShareText = () => {
-    const stopsText = stops.map(s => `${s.num}. ${s.when} — ${s.name}`).join('\n')
+    const stopsText = tripToShareLines(trip).join('\n')
     const msg   = `✅ ${trip.tripName} — Plan Locked!\n📍 ${planDetails.location}  ·  🗓️ ${planDetails.dates}\n\n${stopsText}\n\nSee you there! 🎉`
     if (navigator.share) {
       navigator.share({ title: trip.tripName, text: msg })
@@ -131,10 +147,33 @@ export default function SuccessState({ planDetails, trip, onStartOver, showToast
             Confirmed Itinerary
           </p>
 
-          <div className="flex flex-col gap-[9px]">
+          {days.length > 1 && (
+            <div className="mb-3 -mx-0.5">
+              <ItineraryDayTabBar
+                days={days}
+                activeIndex={activeDayIndex}
+                onChange={setActiveDayIndex}
+              />
+            </div>
+          )}
+
+          <div
+            className="flex flex-col gap-[9px]"
+            role="tabpanel"
+            id={
+              days[activeDayIndex]
+                ? `itinerary-day-panel-${days[activeDayIndex].day}`
+                : undefined
+            }
+            aria-labelledby={
+              days[activeDayIndex]
+                ? `itinerary-day-tab-${days[activeDayIndex].day}`
+                : undefined
+            }
+          >
             {stops.map((stop, i) => (
               <article
-                key={stop.num}
+                key={`${activeDayIndex}-${stop.num}`}
                 className="bg-white border border-cream-deep rounded-panel overflow-hidden shadow-soft animate-fade-up"
                 style={{ animationDelay: `${i * 0.06}s` }}
               >

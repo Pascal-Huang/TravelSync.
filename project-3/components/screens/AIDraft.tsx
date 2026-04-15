@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PlanDetails, IdeaItem } from '../../types'
 import { buildOrderData, isGeneratedTrip, type GeneratedTrip } from '../../lib/buildTripOrder'
+import { ItineraryDayTabBar } from '../ItineraryDayTabBar'
 import TopBar from '../TopBar'
 
 interface Props {
@@ -33,25 +34,26 @@ interface Stop {
   tags:    { label: string; cls: string }[]
 }
 
-function tripJsonToStops(aiData: GeneratedTrip): Stop[] {
+type DayBlock = GeneratedTrip['itinerary'][number]
+
+/** One day’s activities. When `multiDay`, the tab shows the day — left column is time only. */
+function dayBlockToStops(day: DayBlock, multiDay: boolean): Stop[] {
   const formattedStops: Stop[] = []
   const colors = ['bg-sage', 'bg-sand', 'bg-terra']
 
-  aiData.itinerary.forEach(day => {
-    day.activities.forEach((activity, index) => {
-      const dotCls = colors[(day.day + index) % colors.length]
-      formattedStops.push({
-        when: `Day ${day.day}`,
-        time: activity.time,
-        dotCls,
-        hasLine: true,
-        name: activity.name,
-            desc: activity.description,
-            tags: activity.tags.map((tagStr: string) => ({ 
-              label: tagStr, 
-              cls: 'bg-sage-dim text-sage' 
-            }))
-      })
+  day.activities.forEach((activity, index) => {
+    const dotCls = colors[(day.day + index) % colors.length]
+    formattedStops.push({
+      when: multiDay ? activity.time : `Day ${day.day}`,
+      time: multiDay ? '' : activity.time,
+      dotCls,
+      hasLine: true,
+      name: activity.name,
+      desc: activity.description,
+      tags: activity.tags.map((tagStr: string) => ({
+        label: tagStr,
+        cls: 'bg-sage-dim text-sage',
+      })),
     })
   })
 
@@ -67,19 +69,24 @@ export default function AIDraft({ planDetails, ideas, initialTrip, onApprove, on
 
   const [tripData, setTripData] = useState<GeneratedTrip | null>(initialTrip)
   const [tripTitle, setTripTitle] = useState(initialTrip?.tripName ?? 'Proposed Itinerary ✦')
-  const [itineraryStops, setItineraryStops] = useState<Stop[]>(() =>
-    initialTrip ? tripJsonToStops(initialTrip) : [],
-  )
+  const [activeDayIndex, setActiveDayIndex] = useState(0)
 
   const applyTripJson = useCallback((aiData: GeneratedTrip) => {
     setTripData(aiData)
     setTripTitle(aiData.tripName)
-    setItineraryStops(tripJsonToStops(aiData))
+    setActiveDayIndex(0)
   }, [])
+
+  const itineraryDays = tripData?.itinerary
+  const multiDay = (itineraryDays?.length ?? 0) > 1
+  const itineraryStops = useMemo(() => {
+    if (!itineraryDays?.length) return []
+    const idx = Math.min(Math.max(0, activeDayIndex), itineraryDays.length - 1)
+    return dayBlockToStops(itineraryDays[idx], multiDay)
+  }, [itineraryDays, activeDayIndex, multiDay])
 
   const generateRealTrip = useCallback(async () => {
     setIsLoading(true)
-    setItineraryStops([])
 
     const orderData = buildOrderData(planDetails, ideas)
 
@@ -166,14 +173,38 @@ export default function AIDraft({ planDetails, ideas, initialTrip, onApprove, on
                 </span>
               </div>
 
-              {/* Loop over our REAL AI stops instead of the hardcoded STOPS */}
+              {itineraryDays != null && itineraryDays.length > 1 && (
+                <div className="px-[14px] pt-3 pb-0 bg-parchment/40 border-b border-cream-deep">
+                  <ItineraryDayTabBar
+                    days={itineraryDays}
+                    activeIndex={activeDayIndex}
+                    onChange={setActiveDayIndex}
+                  />
+                </div>
+              )}
+
+              <div
+                role="tabpanel"
+                id={
+                  itineraryDays?.[activeDayIndex]
+                    ? `itinerary-day-panel-${itineraryDays[activeDayIndex].day}`
+                    : undefined
+                }
+                aria-labelledby={
+                  itineraryDays?.[activeDayIndex]
+                    ? `itinerary-day-tab-${itineraryDays[activeDayIndex].day}`
+                    : undefined
+                }
+              >
               {itineraryStops.map((stop, i) => (
                 <div key={i} className="px-[18px] py-[14px] flex items-start gap-3.5 border-b border-cream-deep last:border-b-0">
                   <div className="flex-shrink-0 min-w-[52px]">
                     <div className="text-[0.79rem] font-semibold text-sage">{stop.when}</div>
-                    <div className="text-[0.65rem] font-semibold uppercase tracking-[0.07em] text-ink-faint mt-0.5">
-                      {stop.time}
-                    </div>
+                    {stop.time ? (
+                      <div className="text-[0.65rem] font-semibold uppercase tracking-[0.07em] text-ink-faint mt-0.5">
+                        {stop.time}
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="flex flex-col items-center pt-1 flex-shrink-0">
@@ -198,6 +229,7 @@ export default function AIDraft({ planDetails, ideas, initialTrip, onApprove, on
                   </div>
                 </div>
               ))}
+              </div>
             </div>
 
             <div>
