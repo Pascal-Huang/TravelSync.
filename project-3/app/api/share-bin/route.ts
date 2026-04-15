@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getJsonBinMasterKey } from '@/lib/jsonbinKey'
 import {
   buildSharedRecord,
   isIdeaItem,
@@ -36,27 +37,8 @@ function getPublicOrigin(req: Request): string {
   return ''
 }
 
-/**
- * Local `.env.local` may use `\$` so Next does not treat `$2a` as variable expansion.
- * On Vercel, paste the raw key from jsonbin.io; if someone pasted escaped `\$`, normalize it.
- */
-function normalizeJsonBinKey(raw: string | undefined): string | null {
-  if (raw == null) return null
-  let k = raw.trim()
-  if (!k) return null
-  if (k.includes('\\$')) k = k.replace(/\\\$/g, '$')
-  return k
-}
-
-function jsonbinKey(): string | null {
-  const k =
-    normalizeJsonBinKey(process.env.JSONBIN_API_KEY) ||
-    normalizeJsonBinKey(process.env.NEXT_PUBLIC_JSONBIN_API_KEY)
-  return k
-}
-
 function jsonbinHeaders(): HeadersInit {
-  const key = jsonbinKey()
+  const key = getJsonBinMasterKey()
   if (!key) throw new Error('MISSING_KEY')
   return {
     'Content-Type': 'application/json',
@@ -105,7 +87,7 @@ function jsonBinErrorResponse(res: Response, data: unknown): NextResponse {
 
 export async function POST(req: Request) {
   try {
-    if (!jsonbinKey()) {
+    if (!getJsonBinMasterKey()) {
       return NextResponse.json(
         { error: 'JSONBin API key is not configured (JSONBIN_API_KEY).' },
         { status: 500 },
@@ -162,7 +144,7 @@ export async function POST(req: Request) {
 
 export async function GET(req: Request) {
   try {
-    if (!jsonbinKey()) {
+    if (!getJsonBinMasterKey()) {
       return NextResponse.json(
         { error: 'JSONBin API key is not configured (JSONBIN_API_KEY).' },
         { status: 500 },
@@ -199,7 +181,7 @@ export async function GET(req: Request) {
 
 export async function PUT(req: Request) {
   try {
-    if (!jsonbinKey()) {
+    if (!getJsonBinMasterKey()) {
       return NextResponse.json(
         { error: 'JSONBin API key is not configured (JSONBIN_API_KEY).' },
         { status: 500 },

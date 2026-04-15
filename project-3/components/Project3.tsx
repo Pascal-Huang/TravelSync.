@@ -20,18 +20,30 @@ import Toast        from './Toast'
  *  - toastMessage → null = hidden, string = visible
  */
 
-interface HarmonyAppProps {
-  /** From `/?share=` — passed from the server page so opens work on Vercel. */
-  shareFromUrl?: string
+interface InitialShareData {
+  binId: string
+  planDetails: PlanDetails
+  ideas: IdeaItem[]
 }
 
-export default function HarmonyApp({ shareFromUrl }: HarmonyAppProps) {
-  const [screen, setScreen]       = useState<Screen>('setup')
-  const [planDetails, setPlan]    = useState<PlanDetails>({ name: '', location: '', dates: '', group: '', budget: '' })
-  const [ideas, setIdeas]         = useState<IdeaItem[]>([])
+interface HarmonyAppProps {
+  /** From `/?share=` — passed from the server page. */
+  shareFromUrl?: string
+  /** Loaded on the server when opening a share link (avoids client fetch races on Vercel). */
+  initialShareData?: InitialShareData | null
+}
+
+const EMPTY_PLAN: PlanDetails = { name: '', location: '', dates: '', group: '', budget: '' }
+
+export default function HarmonyApp({ shareFromUrl, initialShareData = null }: HarmonyAppProps) {
+  const [screen, setScreen]       = useState<Screen>(() => (initialShareData ? 'sandbox' : 'setup'))
+  const [planDetails, setPlan]    = useState<PlanDetails>(
+    () => initialShareData?.planDetails ?? EMPTY_PLAN,
+  )
+  const [ideas, setIdeas]         = useState<IdeaItem[]>(() => initialShareData?.ideas ?? [])
   const [generatedTrip, setGeneratedTrip] = useState<GeneratedTrip | null>(null)
   const [toastMsg, setToastMsg]   = useState<string | null>(null)
-  const [shareBinId, setShareBinId] = useState<string | null>(null)
+  const [shareBinId, setShareBinId] = useState<string | null>(() => initialShareData?.binId ?? null)
 
   // ── Toast helper ────────────────────────────────────────────
   const showToast = useCallback((msg: string) => {
@@ -39,22 +51,25 @@ export default function HarmonyApp({ shareFromUrl }: HarmonyAppProps) {
     setTimeout(() => setToastMsg(null), 2600)
   }, [])
 
-  // Open `/?share=<binId>` to load a JSONBin-backed sandbox for group collaboration.
+  // Client fallback: server already hydrated `initialShareData` when possible.
   useEffect(() => {
+    if (initialShareData) return
+
     const fromQuery =
       typeof window !== 'undefined'
         ? new URLSearchParams(window.location.search).get('share')?.trim()
         : undefined
     const id = (shareFromUrl?.trim() || fromQuery || '').trim()
     if (!id) return
-    let cancelled = false
+
+    const ac = new AbortController()
     ;(async () => {
       try {
         const res = await fetch(`/api/share-bin?binId=${encodeURIComponent(id)}`, {
           cache: 'no-store',
+          signal: ac.signal,
         })
         const data = await res.json()
-        if (cancelled) return
         if (!res.ok) {
           showToast(typeof data.error === 'string' ? data.error : 'Could not open shared trip.')
           return
@@ -66,15 +81,16 @@ export default function HarmonyApp({ shareFromUrl }: HarmonyAppProps) {
           setShareBinId(id)
           setScreen('sandbox')
           showToast('Loaded shared sandbox — collaborate on the idea board.')
+        } else {
+          showToast('Shared plan data was missing or invalid.')
         }
-      } catch {
-        if (!cancelled) showToast('Could not load shared link.')
+      } catch (e) {
+        if (e && typeof e === 'object' && (e as { name?: string }).name === 'AbortError') return
+        showToast('Could not load shared link.')
       }
     })()
-    return () => {
-      cancelled = true
-    }
-  }, [showToast, shareFromUrl])
+    return () => ac.abort()
+  }, [showToast, shareFromUrl, initialShareData])
 
   // ── Navigation handlers ─────────────────────────────────────
   const handleSetupSubmit = (details: PlanDetails) => {

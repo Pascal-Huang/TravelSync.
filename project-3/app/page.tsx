@@ -1,7 +1,9 @@
-// page.tsx is a Server Component by default in the App Router.
-// Pass `share` from the URL so shared links work reliably on Vercel (same request as HTML).
+// Server loads `/?share=` from JSONBin so the sandbox opens on first paint (reliable on Vercel).
 
 import Project3 from '@/components/Project3'
+import { loadSharedSandboxOnServer } from '@/lib/loadSharedSandboxOnServer'
+
+export const dynamic = 'force-dynamic'
 
 type ShareSearchParams = { share?: string | string[] }
 
@@ -24,5 +26,8 @@ export default async function Page({
   searchParams: Promise<ShareSearchParams>
 }) {
   const sp = await searchParams
-  return <Project3 shareFromUrl={pickShareId(sp)} />
+  const shareId = pickShareId(sp)
+  const initialShareData = shareId ? await loadSharedSandboxOnServer(shareId) : null
+
+  return <Project3 shareFromUrl={shareId} initialShareData={initialShareData} />
 }
