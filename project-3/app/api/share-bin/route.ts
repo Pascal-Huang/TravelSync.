@@ -6,7 +6,35 @@ import {
   isSharedSandboxRecord,
 } from '@/lib/sharedSandbox'
 
+export const dynamic = 'force-dynamic'
+
 const JSONBIN = 'https://api.jsonbin.io/v3/b'
+
+/** Public URL for share links (Vercel often needs forwarded host, not internal `req.url`). */
+function getPublicOrigin(req: Request): string {
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '')
+  if (configured) return configured
+
+  const xfHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim()
+  const xfProto = req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() || 'https'
+  const host = xfHost || req.headers.get('host')?.trim()
+  if (host) {
+    const proto = xfProto.replace(/:+$/, '')
+    return `${proto}://${host}`
+  }
+
+  try {
+    const o = new URL(req.url).origin
+    if (o && o !== 'null') return o
+  } catch {
+    /* ignore */
+  }
+
+  const vercel = process.env.VERCEL_URL?.trim()
+  if (vercel) return `https://${vercel.replace(/^https?:\/\//, '')}`
+
+  return ''
+}
 
 /**
  * Local `.env.local` may use `\$` so Next does not treat `$2a` as variable expansion.
@@ -99,14 +127,14 @@ export async function POST(req: Request) {
     }
     const record = buildSharedRecord(planDetails, ideaList)
 
-    const res = await fetch(JSONBIN, {
+    const binRes = await fetch(JSONBIN, {
       method: 'POST',
       headers: jsonbinHeaders(),
       body: JSON.stringify(record),
     })
-    const data = await readJsonbinJson(res)
-    if (!res.ok) {
-      return jsonBinErrorResponse(res, data)
+    const data = await readJsonbinJson(binRes)
+    if (!binRes.ok) {
+      return jsonBinErrorResponse(binRes, data)
     }
     const meta =
       data && typeof data === 'object' && 'metadata' in data
@@ -117,9 +145,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'JSONBin did not return a bin id' }, { status: 502 })
     }
 
-    const origin = new URL(req.url).origin
-    const shareUrl = `${origin}/?share=${encodeURIComponent(binId)}`
-    return NextResponse.json({ binId, shareUrl, record })
+    const origin = getPublicOrigin(req)
+    const sharePath = `/?share=${encodeURIComponent(binId)}`
+    const shareUrl = origin ? `${origin}${sharePath}` : sharePath
+    const out = NextResponse.json({ binId, shareUrl, record })
+    out.headers.set('Cache-Control', 'no-store, max-age=0')
+    return out
   } catch (e) {
     if (e instanceof Error && e.message === 'MISSING_KEY') {
       return NextResponse.json({ error: 'JSONBin API key missing' }, { status: 500 })
@@ -142,19 +173,21 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Missing binId query parameter' }, { status: 400 })
     }
 
-    const res = await fetch(`${JSONBIN}/${encodeURIComponent(binId)}/latest`, {
+    const binRes = await fetch(`${JSONBIN}/${encodeURIComponent(binId)}/latest`, {
       method: 'GET',
       headers: jsonbinHeaders(),
     })
-    const data = await readJsonbinJson(res)
-    if (!res.ok) {
-      return jsonBinErrorResponse(res, data)
+    const data = await readJsonbinJson(binRes)
+    if (!binRes.ok) {
+      return jsonBinErrorResponse(binRes, data)
     }
     const record = extractRecord(data)
     if (!isSharedSandboxRecord(record)) {
       return NextResponse.json({ error: 'Shared data is missing or invalid' }, { status: 422 })
     }
-    return NextResponse.json({ binId, record })
+    const out = NextResponse.json({ binId, record })
+    out.headers.set('Cache-Control', 'no-store, max-age=0')
+    return out
   } catch (e) {
     if (e instanceof Error && e.message === 'MISSING_KEY') {
       return NextResponse.json({ error: 'JSONBin API key missing' }, { status: 500 })

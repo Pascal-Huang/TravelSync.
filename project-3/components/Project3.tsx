@@ -19,7 +19,13 @@ import Toast        from './Toast'
  *  - ideas        → accumulated IdeaItems from IdeaSandbox
  *  - toastMessage → null = hidden, string = visible
  */
-export default function HarmonyApp() {
+
+interface HarmonyAppProps {
+  /** From `/?share=` — passed from the server page so opens work on Vercel. */
+  shareFromUrl?: string
+}
+
+export default function HarmonyApp({ shareFromUrl }: HarmonyAppProps) {
   const [screen, setScreen]       = useState<Screen>('setup')
   const [planDetails, setPlan]    = useState<PlanDetails>({ name: '', location: '', dates: '', group: '', budget: '' })
   const [ideas, setIdeas]         = useState<IdeaItem[]>([])
@@ -35,13 +41,18 @@ export default function HarmonyApp() {
 
   // Open `/?share=<binId>` to load a JSONBin-backed sandbox for group collaboration.
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const id = new URLSearchParams(window.location.search).get('share')?.trim()
+    const fromQuery =
+      typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('share')?.trim()
+        : undefined
+    const id = (shareFromUrl?.trim() || fromQuery || '').trim()
     if (!id) return
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch(`/api/share-bin?binId=${encodeURIComponent(id)}`)
+        const res = await fetch(`/api/share-bin?binId=${encodeURIComponent(id)}`, {
+          cache: 'no-store',
+        })
         const data = await res.json()
         if (cancelled) return
         if (!res.ok) {
@@ -63,7 +74,7 @@ export default function HarmonyApp() {
     return () => {
       cancelled = true
     }
-  }, [showToast])
+  }, [showToast, shareFromUrl])
 
   // ── Navigation handlers ─────────────────────────────────────
   const handleSetupSubmit = (details: PlanDetails) => {
