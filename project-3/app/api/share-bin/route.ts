@@ -8,11 +8,23 @@ import {
 
 const JSONBIN = 'https://api.jsonbin.io/v3/b'
 
+/**
+ * Local `.env.local` may use `\$` so Next does not treat `$2a` as variable expansion.
+ * On Vercel, paste the raw key from jsonbin.io; if someone pasted escaped `\$`, normalize it.
+ */
+function normalizeJsonBinKey(raw: string | undefined): string | null {
+  if (raw == null) return null
+  let k = raw.trim()
+  if (!k) return null
+  if (k.includes('\\$')) k = k.replace(/\\\$/g, '$')
+  return k
+}
+
 function jsonbinKey(): string | null {
   const k =
-    process.env.JSONBIN_API_KEY?.trim() ||
-    process.env.NEXT_PUBLIC_JSONBIN_API_KEY?.trim()
-  return k || null
+    normalizeJsonBinKey(process.env.JSONBIN_API_KEY) ||
+    normalizeJsonBinKey(process.env.NEXT_PUBLIC_JSONBIN_API_KEY)
+  return k
 }
 
 function jsonbinHeaders(): HeadersInit {
@@ -48,6 +60,21 @@ function extractBinMessage(data: unknown): string {
   return 'JSONBin request failed'
 }
 
+function jsonBinErrorResponse(res: Response, data: unknown): NextResponse {
+  const msg = extractBinMessage(data)
+  const status =
+    res.status === 404
+      ? 404
+      : res.status === 401 || res.status === 403
+        ? res.status
+        : 502
+  const hint =
+    res.status === 401
+      ? ' On Vercel: Project → Settings → Environment Variables → add JSONBIN_API_KEY with your Master Key from https://jsonbin.io/app/api-keys (paste the key as-is with $ characters, not \\$ like local .env). Redeploy after saving.'
+      : ''
+  return NextResponse.json({ error: msg + hint }, { status })
+}
+
 export async function POST(req: Request) {
   try {
     if (!jsonbinKey()) {
@@ -79,10 +106,7 @@ export async function POST(req: Request) {
     })
     const data = await readJsonbinJson(res)
     if (!res.ok) {
-      return NextResponse.json(
-        { error: extractBinMessage(data) },
-        { status: res.status === 401 || res.status === 403 ? res.status : 502 },
-      )
+      return jsonBinErrorResponse(res, data)
     }
     const meta =
       data && typeof data === 'object' && 'metadata' in data
@@ -124,10 +148,7 @@ export async function GET(req: Request) {
     })
     const data = await readJsonbinJson(res)
     if (!res.ok) {
-      return NextResponse.json(
-        { error: extractBinMessage(data) },
-        { status: res.status === 404 ? 404 : 502 },
-      )
+      return jsonBinErrorResponse(res, data)
     }
     const record = extractRecord(data)
     if (!isSharedSandboxRecord(record)) {
@@ -181,10 +202,7 @@ export async function PUT(req: Request) {
     })
     const data = await readJsonbinJson(res)
     if (!res.ok) {
-      return NextResponse.json(
-        { error: extractBinMessage(data) },
-        { status: res.status === 404 ? 404 : 502 },
-      )
+      return jsonBinErrorResponse(res, data)
     }
     return NextResponse.json({ ok: true, record })
   } catch (e) {
