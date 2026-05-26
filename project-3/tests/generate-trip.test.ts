@@ -2,20 +2,23 @@ import { vi, describe, it, expect } from 'vitest'
 
 // Mock the Google GenAI client so tests don't call real API
 vi.mock('@google/genai', () => {
+  // Provide a constructor-style mock so `new GoogleGenAI(...)` works
   return {
-    GoogleGenAI: vi.fn().mockImplementation(() => ({
-      models: {
-        generateContent: async ({ contents }: { contents: string }) => {
-          // Return a predictable JSON string similar to the real service
-          const payload = {
-            tripName: 'My Trip',
-            harmonyPlan: { note: 'All good', conflicts: [] },
-            itinerary: [],
-          }
-          return { text: JSON.stringify(payload) }
+    GoogleGenAI: vi.fn().mockImplementation(function () {
+      return {
+        models: {
+          generateContent: async ({ contents }: { contents: string }) => {
+            // Return a predictable JSON string similar to the real service
+            const payload = {
+              tripName: 'My Trip',
+              harmonyPlan: { note: 'All good', conflicts: [] },
+              itinerary: [],
+            }
+            return { text: JSON.stringify(payload) }
+          },
         },
-      },
-    })),
+      }
+    }),
   }
 })
 
