@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run mocked AI tests (Vitest)
+        run: npx --yes vitest run
+
       - name: Run ESLint
         run: npm run lint
         continue-on-error: true
