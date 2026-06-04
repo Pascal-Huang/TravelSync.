@@ -44,12 +44,12 @@ export default function SubSyncHomeButton() {
         "
       >
         <Image
-          src="https://sub-sync.ca/logos/SubSync.png"
+          src="/Sub Sync (Company Logo).png"
           alt="SubSync"
           width={26}
           height={26}
           className="rounded-full transition-transform duration-300 group-hover:rotate-[20deg]"
-          unoptimized
+
         />
       </a>
     </div>
