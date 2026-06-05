@@ -973,6 +973,82 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
         </div>
       )}
 
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-[140] bg-ink/35"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-trip-title"
+          onMouseDown={() => { if (!deleteBusy) setDeleteTarget(null) }}
+        >
+          <div
+            className="absolute left-1/2 top-1/2 w-[min(360px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-panel border border-cream-deep bg-white p-4 shadow-float animate-pop-in"
+            onMouseDown={e => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3
+                id="delete-trip-title"
+                className="text-[0.86rem] font-semibold tracking-[0.08em] uppercase text-ink-faint"
+              >
+                {deleteTarget.type === 'delete' ? 'Delete Trip' : 'Remove Trip'}
+              </h3>
+              <button
+                type="button"
+                className="rounded-card border border-cream-deep px-2 py-1 text-[0.72rem] font-medium text-ink-mid hover:bg-parchment disabled:opacity-50"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleteBusy}
+                aria-label="Close dialog"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mb-4 rounded-card border border-[#F0D8CE] bg-[#FFF4EF] p-3">
+              {deleteTarget.type === 'delete' ? (
+                <>
+                  <p className="text-[0.84rem] font-semibold text-ink">
+                    &ldquo;{deleteTarget.tripName}&rdquo; will be permanently deleted.
+                  </p>
+                  <p className="mt-1 text-[0.78rem] text-ink-mid">
+                    This can&apos;t be undone. All shares will be removed too.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-[0.84rem] font-semibold text-ink">
+                    You&apos;ll be removed from &ldquo;{deleteTarget.tripName}&rdquo;.
+                  </p>
+                  <p className="mt-1 text-[0.78rem] text-ink-mid">
+                    You can ask to be re-added by the owner.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleteBusy}
+                className="flex-1 rounded-card border border-cream-deep bg-white px-3 py-2 text-[0.8rem] font-semibold text-ink-mid transition hover:bg-parchment disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { void handleDeleteConfirm() }}
+                disabled={deleteBusy}
+                className="flex-1 rounded-card bg-terra px-3 py-2 text-[0.8rem] font-semibold text-white transition hover:bg-[#a0633e] disabled:opacity-60"
+              >
+                {deleteBusy
+                  ? (deleteTarget.type === 'delete' ? 'Deleting…' : 'Removing…')
+                  : (deleteTarget.type === 'delete' ? 'Delete forever' : 'Remove')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Toast message={toastMsg} />
     </div>
   )
