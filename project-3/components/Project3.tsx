@@ -41,6 +41,7 @@ interface SavedTripSummary {
   trip: GeneratedTrip
   createdAt: string
   updatedAt: string
+  start_date?: string | null
 }
 
 interface SavedTripsResponse {
@@ -83,6 +84,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
   const [ideas, setIdeas]         = useState<IdeaItem[]>(() => initialShareData?.ideas ?? [])
   const [generatedTrip, setGeneratedTrip] = useState<GeneratedTrip | null>(null)
   const [savedTripId, setSavedTripId] = useState<string | null>(null)
+  const [tripStartDate, setTripStartDate] = useState<string | null>(null)
   const [activeTripOwnerId, setActiveTripOwnerId] = useState<string | null>(null)
   const [toastMsg, setToastMsg]   = useState<string | null>(null)
   const [plansPanelOpen, setPlansPanelOpen] = useState(false)
@@ -391,6 +393,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
     setPlan(tripSummary.planDetails)
     setIdeas(tripSummary.ideas)
     setSavedTripId(tripSummary.id)
+    setTripStartDate(tripSummary.start_date ?? null)
     setActiveTripOwnerId(tripSummary.ownerId)
 
     if (tripHasActivities(tripSummary.trip)) {
@@ -423,6 +426,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
     setIdeas([])
     setGeneratedTrip(null)
     setSavedTripId(null)
+    setTripStartDate(null)
     setActiveTripOwnerId(null)
     setScreen('setup')
   }
@@ -792,6 +796,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
           onAuthClick={openUserDialog}
           currentUserId={authUser?.id ?? null}
           canShareTrip={Boolean(authUser?.id && activeTripOwnerId && authUser.id === activeTripOwnerId)}
+          tripStartDate={tripStartDate}
         />
       )}
 
