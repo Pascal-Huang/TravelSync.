@@ -5,6 +5,7 @@ import { PlanDetails } from '../../types'
 import { GeneratedTrip } from '../../lib/buildTripOrder'
 import { ItineraryDayTabBar } from '../ItineraryDayTabBar'
 import TopBar from '../TopBar'
+import { MemoriesTab } from "@/components/memories/MemoriesTab"
 
 interface Props {
   planDetails: PlanDetails
@@ -16,6 +17,7 @@ interface Props {
   onAuthClick?: () => void
   currentUserId?: string | null
   canShareTrip?: boolean
+  tripStartDate?: string | null
 }
 
 // ── Confirmed itinerary data ────────────────────────────────────────────────
@@ -61,10 +63,11 @@ function tripToStopsForDay(trip: GeneratedTrip, dayIndex: number): FinalStop[] {
 
 // ── Screen component ────────────────────────────────────────────────────────
 
-export default function SuccessState({ planDetails, trip, tripId, onStartOver, showToast, authLabel, onAuthClick, currentUserId, canShareTrip = true }: Props) {
+export default function SuccessState({ planDetails, trip, tripId, onStartOver, showToast, authLabel, onAuthClick, currentUserId, canShareTrip = true, tripStartDate = null }: Props) {
   const days = trip.itinerary
   const [activeDayIndex, setActiveDayIndex] = useState(0)
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
+  const [activeView, setActiveView] = useState<'itinerary' | 'memories'>('itinerary')
   const [shareUsername, setShareUsername] = useState('')
   const [shareEmail, setShareEmail] = useState('')
   const [shareBusy, setShareBusy] = useState(false)
@@ -197,76 +200,111 @@ export default function SuccessState({ planDetails, trip, tripId, onStartOver, s
           ))}
         </div>
 
-        {/* ── Confirmed itinerary ────────────────────────────────── */}
-        <div role="region" aria-label="Final confirmed itinerary">
-          <p className="text-[0.68rem] font-semibold tracking-[0.1em] uppercase text-ink-faint mb-2">
-            Confirmed Itinerary
-          </p>
-
-          {days.length > 1 && (
-            <div className="mb-3 -mx-0.5">
-              <ItineraryDayTabBar
-                days={days}
-                activeIndex={activeDayIndex}
-                onChange={setActiveDayIndex}
-              />
-            </div>
-          )}
-
-          <div
-            className="flex flex-col gap-[9px]"
-            role="tabpanel"
-            id={
-              days[activeDayIndex]
-                ? `itinerary-day-panel-${days[activeDayIndex].day}`
-                : undefined
-            }
-            aria-labelledby={
-              days[activeDayIndex]
-                ? `itinerary-day-tab-${days[activeDayIndex].day}`
-                : undefined
-            }
+        {/* ── View toggle ───────────────────────────────────────── */}
+        <div className="flex gap-1 p-1 bg-cream-deep rounded-[10px] mb-1 w-fit">
+          <button
+            onClick={() => setActiveView('itinerary')}
+            className={`px-4 py-1.5 rounded-lg text-sm font-sans transition-colors ${
+              activeView === 'itinerary'
+                ? 'bg-parchment text-ink shadow-soft'
+                : 'text-ink-mid hover:text-ink'
+            }`}
           >
-            {stops.map((stop, i) => (
-              <article
-                key={`${activeDayIndex}-${stop.num}`}
-                className="bg-white border border-cream-deep rounded-panel overflow-hidden shadow-soft animate-fade-up"
-                style={{ animationDelay: `${i * 0.06}s` }}
-              >
-                {/* Colour accent bar */}
-                <div
-                  className={`h-[3px] bg-gradient-to-r ${stop.accentFrom} ${stop.accentTo}`}
-                  aria-hidden="true"
-                />
-                <div className="flex items-start gap-3 p-[13px] px-[15px]">
-                  {/* Numbered circle */}
-                  <div
-                    className={`w-[28px] h-[28px] rounded-full flex items-center justify-center text-[0.78rem] font-bold text-white flex-shrink-0 ${stop.numCls}`}
-                    aria-hidden="true"
-                  >
-                    {stop.num}
-                  </div>
-                  {/* Info */}
-                  <div className="flex-1">
-                    <div className="text-[0.72rem] font-semibold text-ink-faint uppercase tracking-[0.06em]">
-                      {stop.when}
-                    </div>
-                    <div className="text-[0.97rem] font-semibold text-ink my-0.5">
-                      {stop.name}
-                    </div>
-                    <div className="text-[0.79rem] text-ink-mid leading-relaxed">
-                      {stop.desc}
-                    </div>
-                  </div>
-                  {/* Icon */}
-                  <span className="text-[1.3rem] flex-shrink-0 mt-px" aria-hidden="true">
-                    {stop.icon}
-                  </span>
-                </div>
-              </article>
-            ))}
-          </div>
+            Itinerary
+          </button>
+          <button
+            onClick={() => setActiveView('memories')}
+            className={`px-4 py-1.5 rounded-lg text-sm font-sans transition-colors ${
+              activeView === 'memories'
+                ? 'bg-parchment text-ink shadow-soft'
+                : 'text-ink-mid hover:text-ink'
+            }`}
+          >
+            Memories
+          </button>
         </div>
+
+        {activeView === 'itinerary' && (
+          <div role="region" aria-label="Final confirmed itinerary">
+            <p className="text-[0.68rem] font-semibold tracking-[0.1em] uppercase text-ink-faint mb-2">
+              Confirmed Itinerary
+            </p>
+
+            {days.length > 1 && (
+              <div className="mb-3 -mx-0.5">
+                <ItineraryDayTabBar
+                  days={days}
+                  activeIndex={activeDayIndex}
+                  onChange={setActiveDayIndex}
+                />
+              </div>
+            )}
+
+            <div
+              className="flex flex-col gap-[9px]"
+              role="tabpanel"
+              id={
+                days[activeDayIndex]
+                  ? `itinerary-day-panel-${days[activeDayIndex].day}`
+                  : undefined
+              }
+              aria-labelledby={
+                days[activeDayIndex]
+                  ? `itinerary-day-tab-${days[activeDayIndex].day}`
+                  : undefined
+              }
+            >
+              {stops.map((stop, i) => (
+                <article
+                  key={`${activeDayIndex}-${stop.num}`}
+                  className="bg-white border border-cream-deep rounded-panel overflow-hidden shadow-soft animate-fade-up"
+                  style={{ animationDelay: `${i * 0.06}s` }}
+                >
+                  {/* Colour accent bar */}
+                  <div
+                    className={`h-[3px] bg-gradient-to-r ${stop.accentFrom} ${stop.accentTo}`}
+                    aria-hidden="true"
+                  />
+                  <div className="flex items-start gap-3 p-[13px] px-[15px]">
+                    {/* Numbered circle */}
+                    <div
+                      className={`w-[28px] h-[28px] rounded-full flex items-center justify-center text-[0.78rem] font-bold text-white flex-shrink-0 ${stop.numCls}`}
+                      aria-hidden="true"
+                    >
+                      {stop.num}
+                    </div>
+                    {/* Info */}
+                    <div className="flex-1">
+                      <div className="text-[0.72rem] font-semibold text-ink-faint uppercase tracking-[0.06em]">
+                        {stop.when}
+                      </div>
+                      <div className="text-[0.97rem] font-semibold text-ink my-0.5">
+                        {stop.name}
+                      </div>
+                      <div className="text-[0.79rem] text-ink-mid leading-relaxed">
+                        {stop.desc}
+                      </div>
+                    </div>
+                    {/* Icon */}
+                    <span className="text-[1.3rem] flex-shrink-0 mt-px" aria-hidden="true">
+                      {stop.icon}
+                    </span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeView === 'memories' && tripId && (
+          <MemoriesTab tripId={tripId} tripStartDate={tripStartDate ?? null} />
+        )}
+
+        {activeView === 'memories' && !tripId && (
+          <div className="py-12 text-center">
+            <p className="text-ink-mid text-sm font-sans">Save your trip first to view memories.</p>
+          </div>
+        )}
 
         {/* ── Share row ──────────────────────────────────────────── */}
         {canShareTrip && (
