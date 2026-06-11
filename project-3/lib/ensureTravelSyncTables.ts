@@ -1,11 +1,18 @@
 import { getDbPool } from '@/lib/db'
 
-export async function ensureTravelSyncTables() {
-  const pool = getDbPool()
-  const client = await pool.connect()
+let ensureTablesPromise: Promise<void> | null = null
 
-  try {
-    await client.query('BEGIN')
+export async function ensureTravelSyncTables() {
+  if (ensureTablesPromise) {
+    return ensureTablesPromise
+  }
+
+  ensureTablesPromise = (async () => {
+    const pool = getDbPool()
+    const client = await pool.connect()
+
+    try {
+      await client.query('BEGIN')
 
     await client.query('CREATE SCHEMA IF NOT EXISTS "TravelSync"')
 
@@ -81,13 +88,17 @@ export async function ensureTravelSyncTables() {
       CREATE INDEX IF NOT EXISTS idx_reminder_logs_trip ON "TravelSync".trip_reminder_logs(trip_id)
     `)
 
-    await client.query('COMMIT')
-  } catch (error) {
-    await client.query('ROLLBACK')
-    throw error
-  } finally {
-    client.release()
-  }
+      await client.query('COMMIT')
+    } catch (error) {
+      ensureTablesPromise = null
+      await client.query('ROLLBACK')
+      throw error
+    } finally {
+      client.release()
+    }
+  })()
+
+  return ensureTablesPromise
 }
 
 export async function getTravelSyncTables() {

@@ -105,6 +105,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
   const [loginBusy, setLoginBusy] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [confirmingTripId, setConfirmingTripId] = useState<string | null>(null)
+  const [emailErrorPopup, setEmailErrorPopup] = useState<{ message: string; code: string } | null>(null)
   const [unconfirmPromptTripId, setUnconfirmPromptTripId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{
     tripId: string
@@ -112,6 +113,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
     type: 'delete' | 'remove'
   } | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
+  const canManageAttendance = screen === 'success'
 
   // ── Toast helper ────────────────────────────────────────────
   const showToast = useCallback((msg: string) => {
@@ -606,6 +608,31 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
     e.stopPropagation()
     if (!authUser?.id || confirmingTripId) return
     setConfirmingTripId(tripId)
+
+    const showEmailFailurePopup = (message: string, code: string) => {
+      setEmailErrorPopup({ message, code })
+      setTimeout(() => setEmailErrorPopup(null), 6000)
+    }
+
+    const sendConfirmationEmailInBackground = async () => {
+      try {
+        const res = await fetch(`/api/trips/${encodeURIComponent(tripId)}/confirm/email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: authUser.id }),
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({})) as { error?: string; code?: string }
+          showEmailFailurePopup(
+            typeof data.error === 'string' ? data.error : 'Attendance email failed to send.',
+            typeof data.code === 'string' ? data.code : `HTTP_${res.status}`,
+          )
+        }
+      } catch {
+        showEmailFailurePopup('Attendance email failed to send.', 'NETWORK_ERROR')
+      }
+    }
+
     try {
       const res = await fetch(`/api/trips/${encodeURIComponent(tripId)}/confirm`, {
         method: 'POST',
@@ -617,8 +644,9 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
         showToast(typeof data?.error === 'string' ? data.error : 'Could not confirm trip.')
         return
       }
-      showToast('Attendance confirmed. Check your email for the itinerary.')
+      showToast('Attendance confirmed.')
       void loadSavedTrips()
+      void sendConfirmationEmailInBackground()
     } catch {
       showToast('Could not reach the server.')
     } finally {
@@ -710,7 +738,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
                           </div>
                           {t.confirmed ? (
                             <span className="shrink-0 rounded-full bg-sage px-2 py-1 text-[0.62rem] font-bold uppercase tracking-[0.07em] text-white">Attending</span>
-                          ) : (
+                          ) : canManageAttendance ? (
                             <button
                               type="button"
                               onClick={e => handleConfirmTrip(t.id, e)}
@@ -719,6 +747,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
                             >
                               {confirmingTripId === t.id ? '…' : 'Confirm'}
                             </button>
+                          ) : null
                           )}
                         </div>
                       </div>
@@ -728,8 +757,14 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
               )}
               <div className="px-4 py-3 border-t border-cream-deep">
                 <p className="text-[0.7rem] text-ink-faint leading-relaxed">
-                  Confirm your attendance to notify the group and get subscription reminders via{' '}
-                  <a href="https://trackersync.sub-sync.ca" target="_blank" rel="noopener noreferrer" className="text-sage underline">SubSync</a>.
+                  {canManageAttendance ? (
+                    <>
+                      Confirm your attendance to notify the group and get subscription reminders via{' '}
+                      <a href="https://trackersync.sub-sync.ca" target="_blank" rel="noopener noreferrer" className="text-sage underline">SubSync</a>.
+                    </>
+                  ) : (
+                    <>Attendance controls unlock once your plan is locked.</>
+                  )}
                 </p>
               </div>
             </div>
@@ -823,7 +858,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
                           </p>
                         </button>
 
-                        {!tripSummary.confirmed && (
+                        {canManageAttendance && !tripSummary.confirmed && (
                           <div className="border-t border-cream-deep px-3 py-2">
                             <button
                               type="button"
@@ -837,7 +872,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
                           </div>
                         )}
 
-                        {tripSummary.confirmed && (
+                        {canManageAttendance && tripSummary.confirmed && (
                           <div className="border-t border-cream-deep px-3 py-2">
                             <button
                               type="button"
@@ -938,7 +973,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
                           </p>
                         </button>
 
-                        {!tripSummary.confirmed && (
+                        {canManageAttendance && !tripSummary.confirmed && (
                           <div className="border-t border-cream-deep px-3 py-2">
                             <button
                               type="button"
@@ -952,7 +987,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
                           </div>
                         )}
 
-                        {tripSummary.confirmed && (
+                        {canManageAttendance && tripSummary.confirmed && (
                           <div className="border-t border-cream-deep px-3 py-2">
                             <button
                               type="button"
@@ -1273,6 +1308,30 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
                   : (deleteTarget.type === 'delete' ? 'Delete forever' : 'Remove')}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {emailErrorPopup && (
+        <div
+          className="fixed bottom-4 left-4 z-[160] w-[min(340px,calc(100vw-2rem))] rounded-panel border border-[#F0D8CE] bg-[#FFF4EF] p-3 shadow-float"
+          role="alert"
+          aria-live="assertive"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[0.76rem] font-semibold tracking-[0.06em] uppercase text-[#8f2c3f]">Attendance Email Failed</p>
+              <p className="mt-1 text-[0.8rem] text-ink">{emailErrorPopup.message}</p>
+              <p className="mt-1 text-[0.72rem] text-[#8f2c3f]">Error code: {emailErrorPopup.code}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEmailErrorPopup(null)}
+              className="rounded-card border border-cream-deep bg-white px-2 py-1 text-[0.72rem] font-medium text-ink-mid hover:bg-parchment"
+              aria-label="Dismiss email error"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
