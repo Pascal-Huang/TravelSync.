@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 interface GenerateTripBody {
   location?: unknown;
   days?: unknown;
@@ -15,6 +13,14 @@ interface PlanInput {
   dates: string;
   group: string;
   budget: string;
+}
+
+function createOpenAIClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY is missing on the server.');
+  }
+  return new OpenAI({ apiKey });
 }
 
 function toTrimmedString(value: unknown, fallback = ''): string {
@@ -141,10 +147,7 @@ export async function POST(req: Request) {
   const body = (await req.json()) as GenerateTripBody;
 
   try {
-    if (!process.env.OPENAI_API_KEY?.trim()) {
-      return NextResponse.json({ error: 'OPENAI_API_KEY is missing on the server.' }, { status: 500 });
-    }
-
+    const openai = createOpenAIClient();
     const promptData = buildPromptText(body);
 
     const response = await openai.responses.create({
