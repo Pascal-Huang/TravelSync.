@@ -80,6 +80,10 @@ function tripHasActivities(trip: GeneratedTrip): boolean {
   return trip.itinerary.some(day => Array.isArray(day.activities) && day.activities.length > 0)
 }
 
+function tripIsLocked(trip: GeneratedTrip | null | undefined): boolean {
+  return Boolean(trip && tripHasActivities(trip))
+}
+
 export default function HarmonyApp({ shareFromUrl, initialShareData = null }: HarmonyAppProps) {
   const [screen, setScreen]       = useState<Screen>(() => (initialShareData ? 'sandbox' : 'setup'))
   const [planDetails, setPlan]    = useState<PlanDetails>(
@@ -724,6 +728,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
                     const daysAway = t.startDate
                       ? Math.ceil((new Date(t.startDate).getTime() - Date.now()) / 86400000)
                       : null
+                    const canManageTripAttendance = canManageAttendance && tripIsLocked(t.trip)
                     return (
                       <div key={t.id} className="px-4 py-3">
                         <div className="flex items-start justify-between gap-2">
@@ -738,7 +743,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
                           </div>
                           {t.confirmed ? (
                             <span className="shrink-0 rounded-full bg-sage px-2 py-1 text-[0.62rem] font-bold uppercase tracking-[0.07em] text-white">Attending</span>
-                          ) : canManageAttendance ? (
+                          ) : canManageTripAttendance ? (
                             <button
                               type="button"
                               onClick={e => handleConfirmTrip(t.id, e)}
@@ -826,7 +831,9 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
                       No saved plans yet.
                     </div>
                   ) : (
-                    myTrips.map(tripSummary => (
+                    myTrips.map(tripSummary => {
+                      const canManageTripAttendance = canManageAttendance && tripIsLocked(tripSummary.trip)
+                      return (
                       <div key={tripSummary.id} className="relative w-full rounded-panel border border-cream-deep bg-white shadow-soft transition hover:-translate-y-[1px] hover:border-ink-faint">
                         <button
                           type="button"
@@ -858,7 +865,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
                           </p>
                         </button>
 
-                        {canManageAttendance && !tripSummary.confirmed && (
+                        {canManageTripAttendance && !tripSummary.confirmed && (
                           <div className="border-t border-cream-deep px-3 py-2">
                             <button
                               type="button"
@@ -872,7 +879,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
                           </div>
                         )}
 
-                        {canManageAttendance && tripSummary.confirmed && (
+                        {canManageTripAttendance && tripSummary.confirmed && (
                           <div className="border-t border-cream-deep px-3 py-2">
                             <button
                               type="button"
@@ -925,7 +932,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
                           🗑
                         </button>
                       </div>
-                    ))
+                    )})
                   )}
                 </div>
               </section>
@@ -941,7 +948,9 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
                       No shared plans yet.
                     </div>
                   ) : (
-                    sharedTrips.map(tripSummary => (
+                    sharedTrips.map(tripSummary => {
+                      const canManageTripAttendance = canManageAttendance && tripIsLocked(tripSummary.trip)
+                      return (
                       <div key={tripSummary.id} className="relative w-full rounded-panel border border-cream-deep bg-white shadow-soft transition hover:-translate-y-[1px] hover:border-ink-faint">
                         <button
                           type="button"
@@ -973,7 +982,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
                           </p>
                         </button>
 
-                        {canManageAttendance && !tripSummary.confirmed && (
+                        {canManageTripAttendance && !tripSummary.confirmed && (
                           <div className="border-t border-cream-deep px-3 py-2">
                             <button
                               type="button"
@@ -987,7 +996,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
                           </div>
                         )}
 
-                        {canManageAttendance && tripSummary.confirmed && (
+                        {canManageTripAttendance && tripSummary.confirmed && (
                           <div className="border-t border-cream-deep px-3 py-2">
                             <button
                               type="button"
@@ -1040,7 +1049,7 @@ export default function HarmonyApp({ shareFromUrl, initialShareData = null }: Ha
                           🗑
                         </button>
                       </div>
-                    ))
+                    )})
                   )}
                 </div>
               </section>
