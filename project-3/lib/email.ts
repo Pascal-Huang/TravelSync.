@@ -1,4 +1,11 @@
 import nodemailer from 'nodemailer'
+import dns from 'node:dns'
+
+try {
+  dns.setDefaultResultOrder('ipv4first')
+} catch {
+  // Ignore for runtimes that do not support result order overrides.
+}
 
 function getTransporter() {
   const user = process.env.EMAIL_USER?.trim()
@@ -9,7 +16,9 @@ function getTransporter() {
   }
 
   return nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
     auth: { user, pass },
   })
 }
